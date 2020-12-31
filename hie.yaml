@@ -1,0 +1,6 @@
+cradle:
+  cabal:
+    - path: ./app
+      component: nn-accelerate-cuda:exe:nn
+    - path: ./src
+      component: nn-accelerate-cuda:lib:nn-accelerate-cuda

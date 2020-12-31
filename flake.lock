@@ -1,0 +1,45 @@
+{
+  "nodes": {
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1609337906,
+        "narHash": "sha256-o/jWhOSAlaK7y2M57OIriRt6whuVVocS/T0mG7fd1TI=",
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "e9158eca70ae59e73fae23be5d13d3fa0cfc78b4",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nixos",
+        "ref": "master",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "nixpkgs": "nixpkgs",
+        "vulkan": "vulkan"
+      }
+    },
+    "vulkan": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1608095549,
+        "narHash": "sha256-p9/0Bg79dN9EONE8b+MgAiJnQQsD9I5RYaVe897TT6Y=",
+        "owner": "expipiplus1",
+        "repo": "vulkan",
+        "rev": "c81eb93e3794997508ab068cd7ed57e66311ff96",
+        "type": "github"
+      },
+      "original": {
+        "owner": "expipiplus1",
+        "ref": "master",
+        "repo": "vulkan",
+        "type": "github"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}
