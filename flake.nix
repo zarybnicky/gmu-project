@@ -1,8 +1,8 @@
 {
   inputs.nixpkgs.url = github:nixos/nixpkgs/master;
-  inputs.vulkan = { url = github:expipiplus1/vulkan/master; flake = false; };
+  inputs.CLUtil = { url = github:acowley/CLUtil/master; flake = false; };
 
-  outputs = { self, nixpkgs, vulkan }: let
+  outputs = { self, nixpkgs, CLUtil }: let
     inherit (nixpkgs.lib) flip mapAttrs mapAttrsToList;
     inherit (pkgs.nix-gitignore) gitignoreSourcePure gitignoreSource;
 
@@ -15,22 +15,22 @@
     };
     hsPkgs = pkgs.haskellPackages;
     getSrc = dir: gitignoreSourcePure [./.gitignore] dir;
-    vulkanPkgs = import vulkan {
-      inherit pkgs;
-      forShell = false;
-    };
   in {
     overlay = final: prev: let
-      inherit (prev.haskell.lib) doJailbreak dontCheck unmarkBroken addExtraLibrary;
+      inherit (prev.haskell.lib) doJailbreak dontCheck unmarkBroken
+        overrideCabal dontHaddock;
     in {
       haskell = prev.haskell // {
         packageOverrides = prev.lib.composeExtensions (prev.haskell.packageOverrides or (_: _: {})) (hself: hsuper: {
           nn-accelerate-cuda = hself.callCabal2nix "nn-accelerate-cuda" (getSrc ./.) {};
           autoapply = doJailbreak (unmarkBroken hsuper.autoapply);
-          # inherit (vulkanPkgs)
-          #   vulkan vulkan-utils VulkanMemoryAllocator openxr pretty-simple derive-storable
-          #   derive-storable-plugin nothunks eventlog2html hs-speedoscope
-          #   hvega pandoc language-c;
+          CLUtil = dontHaddock (dontCheck (hself.callCabal2nix "CLUtil" CLUtil {}));
+          OpenCL = overrideCabal (dontCheck (doJailbreak (unmarkBroken hsuper.OpenCL))) (drv: {
+            configureFlags = (drv.configureFlags or []) ++ [
+              "--extra-lib-dirs=${pkgs.ocl-icd}/lib"
+              "--extra-include-dirs=${pkgs.opencl-headers}/include"
+            ];
+          });
         });
       };
     };

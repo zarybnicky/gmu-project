@@ -1,5 +1,22 @@
 {
   "nodes": {
+    "CLUtil": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1564839395,
+        "narHash": "sha256-ors7h/7Qo8W80tGY2yjKwmdASTpfzMMbu8YR8LqT87w=",
+        "owner": "acowley",
+        "repo": "CLUtil",
+        "rev": "d57f05cb3419001b3079d4dfd738bf4538a115ce",
+        "type": "github"
+      },
+      "original": {
+        "owner": "acowley",
+        "ref": "master",
+        "repo": "CLUtil",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1609337906,
@@ -18,25 +35,8 @@
     },
     "root": {
       "inputs": {
-        "nixpkgs": "nixpkgs",
-        "vulkan": "vulkan"
-      }
-    },
-    "vulkan": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1608095549,
-        "narHash": "sha256-p9/0Bg79dN9EONE8b+MgAiJnQQsD9I5RYaVe897TT6Y=",
-        "owner": "expipiplus1",
-        "repo": "vulkan",
-        "rev": "c81eb93e3794997508ab068cd7ed57e66311ff96",
-        "type": "github"
-      },
-      "original": {
-        "owner": "expipiplus1",
-        "ref": "master",
-        "repo": "vulkan",
-        "type": "github"
+        "CLUtil": "CLUtil",
+        "nixpkgs": "nixpkgs"
       }
     }
   },

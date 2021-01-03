@@ -16,65 +16,25 @@ common shared
                       -Wredundant-constraints
                       -Wmonomorphism-restriction
                       -fwarn-tabs
-  default-extensions:
-                       DataKinds
-                       DefaultSignatures
-                       DeriveFoldable
-                       DeriveFunctor
-                       DeriveTraversable
-                       DerivingStrategies
-                       DuplicateRecordFields
-                       FlexibleContexts
-                       FlexibleInstances
-                       GADTs
-                       GeneralizedNewtypeDeriving
-                       InstanceSigs
-                       LambdaCase
-                       MagicHash
-                       NamedFieldPuns
-                       NoMonomorphismRestriction
-                       NumDecimals
-                       OverloadedStrings
-                       PatternSynonyms
-                       PolyKinds
-                       QuantifiedConstraints
-                       RankNTypes
-                       RecordWildCards
-                       RoleAnnotations
-                       ScopedTypeVariables
-                       StandaloneDeriving
-                       Strict
-                       TupleSections
-                       TypeApplications
-                       TypeFamilyDependencies
-                       TypeOperators
-                       TypeSynonymInstances
-                       ViewPatterns
 
 library
   import: shared
   hs-source-dirs:      src
-  exposed-modules:     Gmu.Command
-                       Gmu.Instance
-                       Gmu.Neural
-                       Gmu.Monad
-                       Gmu.Quasi
+  exposed-modules:     Gmu.Neural
 
   build-depends:       base >=4.7 && <5
-                     , JuicyPixels
-                     , VulkanMemoryAllocator
-                     , autoapply >= 0.4
+                     , CLUtil
+                     , OpenCL
                      , bytestring
+                     , file-embed
+                     , hmatrix
                      , mtl
-                     , resourcet
-                     , safe-exceptions
-                     , say
+                     , storable-record
                      , template-haskell
                      , text
                      , transformers
                      , vector
-                     , vulkan
-                     , vulkan-utils
+                     , vector-sized
 
 executable nn
   import: shared
@@ -87,4 +47,3 @@ executable nn
 
   build-depends:       base >=4.7 && <5
                      , nn-accelerate-cuda
-                     , hmatrix
