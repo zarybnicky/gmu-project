@@ -1,50 +1,38 @@
 {
   inputs.nixpkgs.url = github:nixos/nixpkgs/master;
-  inputs.CLUtil = { url = github:acowley/CLUtil/master; flake = false; };
 
-  outputs = { self, nixpkgs, CLUtil }: let
+  outputs = { self, nixpkgs }: let
     inherit (nixpkgs.lib) flip mapAttrs mapAttrsToList;
-    inherit (pkgs.nix-gitignore) gitignoreSourcePure gitignoreSource;
+    inherit (pkgs.nix-gitignore) gitignoreSourcePure;
 
     pkgs = import nixpkgs {
       system = "x86_64-linux";
-      config = {
-        allowUnfree = true;
-      };
+      config.allowUnfree = true;
       overlays = [ self.overlay ];
     };
-    hsPkgs = pkgs.haskellPackages;
-    getSrc = dir: gitignoreSourcePure [./.gitignore] dir;
   in {
-    overlay = final: prev: let
-      inherit (prev.haskell.lib) doJailbreak dontCheck unmarkBroken
-        overrideCabal dontHaddock;
-    in {
-      haskell = prev.haskell // {
-        packageOverrides = prev.lib.composeExtensions (prev.haskell.packageOverrides or (_: _: {})) (hself: hsuper: {
-          nn-accelerate-cuda = hself.callCabal2nix "nn-accelerate-cuda" (getSrc ./.) {};
-          autoapply = doJailbreak (unmarkBroken hsuper.autoapply);
-          CLUtil = dontHaddock (dontCheck (hself.callCabal2nix "CLUtil" CLUtil {}));
-          OpenCL = overrideCabal (dontCheck (doJailbreak (unmarkBroken hsuper.OpenCL))) (drv: {
-            configureFlags = (drv.configureFlags or []) ++ [
-              "--extra-lib-dirs=${pkgs.ocl-icd}/lib"
-              "--extra-include-dirs=${pkgs.opencl-headers}/include"
-            ];
-          });
-        });
+    overlay = final: prev: {
+      gmu-opencl = pkgs.stdenv.mkDerivation rec {
+        name = "gmu-opencl";
+        src = gitignoreSourcePure [./.gitignore] ./.;
+        configurePhase = "${pkgs.xxd}/bin/xxd -i kernel.cl > kernel.c && cmake .";
+        buildPhase = "make";
+        installPhase = "mkdir -p $out/bin && mv gmu-nn $out/bin";
+        buildInputs = with pkgs; [
+          cmake
+          boost
+          opencl-headers
+          hexdump
+          rocm-opencl-runtime
+          opencv2
+        ];
       };
     };
 
-    devShell.x86_64-linux = hsPkgs.shellFor {
-      withHoogle = true;
-      packages = p: [ p.nn-accelerate-cuda ];
-      buildInputs = [
-        hsPkgs.cabal-install
-        hsPkgs.haskell-language-server
-        pkgs.shaderc
-        hsPkgs.stylish-haskell
-      ];
+    defaultPackage.x86_64-linux = pkgs.gmu-opencl;
+    devShell.x86_64-linux = pkgs.mkShell {
+      inputsFrom = [pkgs.gmu-opencl];
+      buildInputs = [pkgs.gdb pkgs.valgrind];
     };
-
   };
 }
