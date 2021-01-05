@@ -52,6 +52,7 @@ import System.Mem.Weak (addFinalizer)
 import Numeric.LinearAlgebra.Devel (MatrixOrder(ColumnMajor), matrixFromVector)
 import Data.Int (Int32)
 import Data.Word (Word32)
+import Control.DeepSeq (NFData)
 
 data CLState = CLState
   { clContext :: {-# UNPACK #-} !CLContext
@@ -118,7 +119,7 @@ withCL :: (CLState -> IO a) -> IO a
 withCL f = f =<< readIORef globalCLState
 
 newtype CLBuffer a = CLBuffer CLMem
-  deriving newtype (Storable)
+  deriving newtype (Show, NFData, Storable)
 
 writeBufferR :: forall n. KnownNat n => CLState -> CLBuffer (R n) -> R n -> IO ()
 writeBufferR cl (CLBuffer buf) vec = do

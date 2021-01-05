@@ -45,12 +45,12 @@ instance Show (FullyConnectedCL i o) where
   show FullyConnectedCL {} = "FullyConnectedCL"
 
 instance (KnownNat i, KnownNat o) => UpdateLayer (FullyConnectedCL i o) where
-  type Gradient (FullyConnectedCL i o) = (FullyConnected'CL i o)
+  type Gradient (FullyConnectedCL i o) = ()
 
   --   let (nB, nBM) = descendVector lp oB bG oBM
   --       (nA, nM) = descendMatrix lp oA aG oM
   --   in FullyConnectedCL (FullyConnected'CL nB nA) (FullyConnected'CL nBM nM)
-  runUpdate lp n _ =
+  runUpdate lp n () =
     unsafeWithCL $ \cl -> do
       let k = kUpdate n
       lastLp <- readIORef (lpRef n)
@@ -67,7 +67,7 @@ instance (KnownNat i, KnownNat o) => UpdateLayer (FullyConnectedCL i o) where
   createRandom = randomFullyConnectedCL
 
 instance (KnownNat i, KnownNat o) => Layer (FullyConnectedCL i o) ('D1 i) ('D1 o) where
-  type Tape (FullyConnectedCL i o) ('D1 i) ('D1 o) = CLBuffer (R i)
+  type Tape (FullyConnectedCL i o) ('D1 i) ('D1 o) = ()
 
   -- Do a matrix vector multiplication and return the result.
   -- (v, S1D (wB + wN #> v))
@@ -76,7 +76,7 @@ instance (KnownNat i, KnownNat o) => Layer (FullyConnectedCL i o) ('D1 i) ('D1 o
       writeBufferR cl (wTape n) v
       _ <- clEnqueueNDRangeKernel' (clQueue cl) (kForward n) [len]
       res <- readBufferR cl (wOut n) (Just (konst 0))
-      pure (wTape n, S1D res)
+      pure ((), S1D res)
     where
       len = fromIntegral (natVal (Proxy @o))
 
@@ -84,18 +84,19 @@ instance (KnownNat i, KnownNat o) => Layer (FullyConnectedCL i o) ('D1 i) ('D1 o
   -- let wB' = dEdy; mm' = dEdy `outer` x
   --     dWs  = tr wN #> dEdy
   -- in  (FullyConnected'CL wB' mm', S1D dWs)
-  runBackwards n _ (S1D dEdy) =
+  runBackwards n () (S1D dEdy) =
     unsafeWithCL $ \cl -> do
       let FullyConnected'CL bG _ = wGradient n
       writeBufferR cl bG dEdy
       _ <- clEnqueueNDRangeKernel' (clQueue cl) (kBackward n) [len]
       dWs <- readBufferR cl (wIn n) (Just (konst 0))
-      pure (wGradient n, S1D dWs)
+      pure ((), S1D dWs)
     where
       len = fromIntegral (max (natVal (Proxy @o)) (natVal (Proxy @i)))
 
-randomFullyConnectedCL :: forall i o m. (MonadIO m, MonadRandom m, KnownNat i, KnownNat o)
-                     => m (FullyConnectedCL i o)
+randomFullyConnectedCL
+  :: forall i o m. (MonadIO m, MonadRandom m, KnownNat i, KnownNat o)
+  => m (FullyConnectedCL i o)
 randomFullyConnectedCL = do
   s1 <- getRandom
   s2 <- getRandom

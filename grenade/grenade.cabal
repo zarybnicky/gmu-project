@@ -52,7 +52,6 @@ library
 
                      , file-embed
                      , OpenCL
-                     , CLUtil
 
   ghc-options:
                        -Wall

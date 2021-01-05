@@ -21,11 +21,7 @@ Stability   : experimental
 module Grenade.Core.Shape (
     S (..)
   , Shape (..)
-#if MIN_VERSION_singletons(2,6,0)
   , SShape (..)
-#else
-  , Sing (..)
-#endif
 
   , randomOfShape
   , fromStorable
@@ -34,9 +30,7 @@ module Grenade.Core.Shape (
 import           Control.DeepSeq (NFData (..))
 import           Control.Monad.Random ( MonadRandom, getRandom )
 
-#if MIN_VERSION_base(4,13,0)
 import           Data.Kind (Type)
-#endif
 import           Data.Proxy
 import           Data.Serialize
 import           Data.Singletons
@@ -44,15 +38,13 @@ import           Data.Singletons.TypeLits
 import           Data.Vector.Storable ( Vector )
 import qualified Data.Vector.Storable as V
 
-#if MIN_VERSION_base(4,11,0)
 import           GHC.TypeLits hiding (natVal)
-#else
-import           GHC.TypeLits
-#endif
 
 import qualified Numeric.LinearAlgebra.Static as H
 import           Numeric.LinearAlgebra.Static
 import qualified Numeric.LinearAlgebra as NLA
+
+import Grenade.OpenCL.Context (mkBufferR, mkBufferL, unsafeWithCL, CLBuffer)
 
 -- | The current shapes we accept.
 --   at the moment this is just one, two, and three dimensional
@@ -67,25 +59,20 @@ data Shape
   | D3 Nat Nat Nat
   -- ^ Three dimensional matrix. Row, Column, Channels.
 
+  | CL1 Nat
+  | CL2 Nat Nat
+
 -- | Concrete data structures for a Shape.
 --
 --   All shapes are held in contiguous memory.
 --   3D is held in a matrix (usually row oriented) which has height depth * rows.
 data S (n :: Shape) where
-  S1D :: ( KnownNat len )
-      => R len
-      -> S ('D1 len)
+  S1D :: KnownNat len => R len -> S ('D1 len)
+  S2D :: (KnownNat r, KnownNat c) => L r c -> S ('D2 r c)
+  S3D :: (KnownNat r, KnownNat c, KnownNat d, KnownNat (r * d)) => L (r * d) c -> S ('D3 r c d)
 
-  S2D :: ( KnownNat rows, KnownNat columns )
-      => L rows columns
-      -> S ('D2 rows columns)
-
-  S3D :: ( KnownNat rows
-         , KnownNat columns
-         , KnownNat depth
-         , KnownNat (rows * depth))
-      => L (rows * depth) columns
-      -> S ('D3 rows columns depth)
+  S1CL :: KnownNat len => CLBuffer (R len) -> S ('CL1 len)
+  S2CL :: (KnownNat r, KnownNat c) => CLBuffer (L r c) -> S ('CL2 r c)
 
 deriving instance Show (S n)
 
@@ -94,20 +81,15 @@ deriving instance Show (S n)
 -- These could probably be derived with template haskell, but this seems
 -- clear and makes adding the KnownNat constraints simple.
 -- We can also keep our code TH free, which is great.
-#if MIN_VERSION_singletons(2,6,0)
--- In singletons 2.6 Sing switched from a data family to a type family.
 type instance Sing = SShape
 
 data SShape :: Shape -> Type where
   D1Sing :: Sing a -> SShape ('D1 a)
   D2Sing :: Sing a -> Sing b -> SShape ('D2 a b)
   D3Sing :: KnownNat (a * c) => Sing a -> Sing b -> Sing c -> SShape ('D3 a b c)
-#else
-data instance Sing (n :: Shape) where
-  D1Sing :: Sing a -> Sing ('D1 a)
-  D2Sing :: Sing a -> Sing b -> Sing ('D2 a b)
-  D3Sing :: KnownNat (a * c) => Sing a -> Sing b -> Sing c -> Sing ('D3 a b c)
-#endif
+
+  CL1Sing :: Sing a -> SShape ('CL1 a)
+  CL2Sing :: Sing a -> Sing b -> SShape ('CL2 a b)
 
 instance KnownNat a => SingI ('D1 a) where
   sing = D1Sing sing
@@ -115,6 +97,11 @@ instance (KnownNat a, KnownNat b) => SingI ('D2 a b) where
   sing = D2Sing sing sing
 instance (KnownNat a, KnownNat b, KnownNat c, KnownNat (a * c)) => SingI ('D3 a b c) where
   sing = D3Sing sing sing sing
+
+instance KnownNat a => SingI ('CL1 a) where
+  sing = CL1Sing sing
+instance (KnownNat a, KnownNat b) => SingI ('CL2 a b) where
+  sing = CL2Sing sing sing
 
 instance SingI x => Num (S x) where
   (+) = n2 (+)
@@ -157,6 +144,8 @@ instance NFData (S x) where
   rnf (S1D x) = rnf x
   rnf (S2D x) = rnf x
   rnf (S3D x) = rnf x
+  rnf (S1CL x) = rnf x
+  rnf (S2CL x) = rnf x
 
 -- | Generate random data of the desired shape
 randomOfShape :: forall x m. ( MonadRandom m, SingI x ) => m (S x)
@@ -164,13 +153,19 @@ randomOfShape = do
   seed :: Int <- getRandom
   return $ case (sing :: Sing x) of
     D1Sing SNat ->
-        S1D (randomVector  seed Uniform * 2 - 1)
+        S1D (randomVector seed Uniform * 2 - 1)
 
     D2Sing SNat SNat ->
         S2D (uniformSample seed (-1) 1)
 
     D3Sing SNat SNat SNat ->
         S3D (uniformSample seed (-1) 1)
+
+    CL1Sing SNat ->
+        S1CL $ unsafeWithCL $ \cl -> mkBufferR cl (randomVector seed Uniform * 2 - 1)
+
+    CL2Sing SNat SNat ->
+        S2CL $ unsafeWithCL $ \cl -> mkBufferL cl (uniformSample seed (-1) 1)
 
 -- | Generate a shape from a Storable Vector.
 --
@@ -185,6 +180,9 @@ fromStorable xs = case sing :: Sing x of
 
     D3Sing SNat SNat SNat ->
       S3D <$> mkL xs
+
+    CL1Sing SNat -> error "fromStorable: CL1Sing SNat"
+    CL2Sing SNat SNat -> error "fromStorable: CL2Sing SNat SNat"
   where
     mkL :: forall rows columns. (KnownNat rows, KnownNat columns)
         => Vector Double -> Maybe (L rows columns)
@@ -201,6 +199,8 @@ instance SingI x => Serialize (S x) where
             (S1D x) -> putListOf put . NLA.toList . H.extract $ x
             (S2D x) -> putListOf put . NLA.toList . NLA.flatten . H.extract $ x
             (S3D x) -> putListOf put . NLA.toList . NLA.flatten . H.extract $ x
+            (S1CL _) -> error "put: S1CL"
+            (S2CL _) -> error "put: S2CL"
           ) :: PutM ()
 
   get = do
@@ -212,12 +212,16 @@ n1 :: ( forall a. Floating a => a -> a ) -> S x -> S x
 n1 f (S1D x) = S1D (f x)
 n1 f (S2D x) = S2D (f x)
 n1 f (S3D x) = S3D (f x)
+n1 _ (S1CL _) = error "Num a => CLBuffer (CL1 n)"
+n1 _ (S2CL _) = error "Num a => CLBuffer (CL2 m n)"
 
 -- Helper function for creating the number instances
 n2 :: ( forall a. Floating a => a -> a -> a ) -> S x -> S x -> S x
 n2 f (S1D x) (S1D y) = S1D (f x y)
 n2 f (S2D x) (S2D y) = S2D (f x y)
 n2 f (S3D x) (S3D y) = S3D (f x y)
+n2 _ (S1CL _) (S1CL _) = error "Num a => CLBuffer (CL1 n)"
+n2 _ (S2CL _) (S2CL _) = error "Num a => CLBuffer (CL2 m n)"
 
 -- Helper function for creating the number instances
 nk :: forall x. SingI x => Double -> S x
@@ -230,3 +234,9 @@ nk x = case (sing :: Sing x) of
 
   D3Sing SNat SNat SNat ->
     S3D (konst x)
+
+  CL1Sing SNat ->
+    unsafeWithCL $ \cl -> S1CL <$> mkBufferR cl (konst x)
+
+  CL2Sing SNat SNat ->
+    unsafeWithCL $ \cl -> S2CL <$> mkBufferL cl (konst x)
