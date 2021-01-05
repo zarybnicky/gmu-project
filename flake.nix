@@ -28,6 +28,7 @@
               "--extra-include-dirs=${pkgs.opencl-headers}/include"
             ];
           });
+          profiteur = doJailbreak (unmarkBroken hsuper.profiteur);
         });
       };
     };
@@ -39,6 +40,7 @@
         hsPkgs.cabal-install
         hsPkgs.haskell-language-server
         hsPkgs.stylish-haskell
+        hsPkgs.profiteur
       ];
     };
   };

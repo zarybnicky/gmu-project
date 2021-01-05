@@ -31,7 +31,7 @@ module Grenade.Core.Network (
   , randomNetwork
   ) where
 
-import           Control.Monad.Random ( MonadRandom )
+import           Control.Monad.Random (MonadIO,  MonadRandom )
 
 import           Data.Singletons
 import           Data.Singletons.Prelude
@@ -162,7 +162,7 @@ class CreatableNetwork (xs :: [Type]) (ss :: [Shape]) where
   --
   --   Calls to this function will not compile if the type of the neural
   --   network is not sound.
-  randomNetwork :: MonadRandom m => m (Network xs ss)
+  randomNetwork :: (MonadIO m, MonadRandom m) => m (Network xs ss)
 
 instance SingI i => CreatableNetwork '[] '[i] where
   randomNetwork = return NNil

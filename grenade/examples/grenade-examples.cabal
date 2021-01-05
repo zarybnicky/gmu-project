@@ -16,10 +16,7 @@ source-repository head
   location: https://github.com/HuwCampbell/grenade.git
 
 library
-
-executable             feedforward
-    ghc-options:       -Wall -threaded -O2
-    main-is:           main/feedforward.hs
+    ghc-options:       -Wall -Wcompat
     build-depends:     base
                      , grenade
                      , attoparsec
@@ -34,9 +31,29 @@ executable             feedforward
                      , singletons
                      , semigroups
                      , MonadRandom
+                     , vector
+
+executable             feedforward
+    ghc-options:       -Wall -threaded -O2 -rtsopts
+    main-is:           main/feedforward.hs
+    build-depends:     base
+                     , grenade
+                     , attoparsec
+                     , bytestring
+                     , cereal
+                     , containers
+                     , either
+                     , optparse-applicative            >= 0.13       && < 0.16
+                     , text                            == 1.2.*
+                     , mtl                             >= 2.2.1      && < 2.3
+                     , hmatrix
+                     , transformers
+                     , singletons
+                     , semigroups
+                     , MonadRandom
 
 executable             mnist
-    ghc-options:       -Wall -threaded -O2
+    ghc-options:       -Wall -threaded -O2 -rtsopts
     main-is:           main/mnist.hs
     build-depends:     base
                      , grenade
@@ -53,7 +70,7 @@ executable             mnist
                      , vector
 
 executable             gan-mnist
-    ghc-options:       -Wall -threaded -O2
+    ghc-options:       -Wall -threaded -O2 -rtsopts
     main-is:           main/gan-mnist.hs
     build-depends:     base
                      , grenade
@@ -72,7 +89,7 @@ executable             gan-mnist
                      , vector
 
 executable             recurrent
-    ghc-options:       -Wall -threaded -O2
+    ghc-options:       -Wall -threaded -O2 -rtsopts
     main-is:           main/recurrent.hs
     build-depends:     base
                      , grenade
@@ -88,7 +105,7 @@ executable             recurrent
                      , MonadRandom
 
 executable             shakespeare
-    ghc-options:       -Wall -threaded -O2
+    ghc-options:       -Wall -threaded -O2 -rtsopts
     main-is:           main/shakespeare.hs
     build-depends:     base
                      , grenade

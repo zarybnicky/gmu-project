@@ -44,9 +44,6 @@ import           Control.Monad.Trans.Except
 import qualified Data.Attoparsec.Text as A
 import qualified Data.ByteString as B
 import           Data.List ( foldl' )
-#if ! MIN_VERSION_base(4,13,0)
-import           Data.Semigroup ( (<>) )
-#endif
 import           Data.Serialize
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
@@ -127,9 +124,8 @@ ganTest (discriminator0, generator0) iterations trainFile rate = do
 
   runIteration :: [S ('D2 28 28)] -> (Discriminator, Generator) -> Int -> IO (Discriminator, Generator)
   runIteration trainData ( !discriminator, !generator ) _ = do
-    trained'    <- foldM ( \(!discriminatorX, !generatorX ) realExample -> do
-                      fakeExample <- randomOfShape
-                      return $ trainExample rate discriminatorX generatorX realExample fakeExample
+    trained'    <- foldM ( \(!discriminatorX, !generatorX ) realExample ->
+                      trainExample rate discriminatorX generatorX realExample <$> randomOfShape
                      ) ( discriminator, generator ) trainData
 
 

@@ -38,7 +38,7 @@ module Grenade.Core.Layer (
   , UpdateLayer (..)
   ) where
 
-import           Control.Monad.Random ( MonadRandom )
+import           Control.Monad.Random (MonadIO,  MonadRandom )
 
 import           Data.List ( foldl' )
 
@@ -61,7 +61,7 @@ class UpdateLayer x where
   runUpdate       :: LearningParameters -> x -> Gradient x -> x
 
   -- | Create a random layer, many layers will use pure
-  createRandom    :: MonadRandom m => m x
+  createRandom    :: (MonadRandom m, MonadIO m) => m x
 
   -- | Update a layer with many Gradients
   runUpdates      :: LearningParameters -> x -> [Gradient x] -> x

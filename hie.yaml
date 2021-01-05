@@ -1,0 +1,10 @@
+cradle:
+  cabal:
+    - path: grenade/src
+      component: grenade:lib:grenade
+    - path: grenade/test
+      component: grenade:test:test
+    - path: grenade/src-gmu
+      component: grenade:lib:grenade
+    - path: grenade/examples
+      component: grenade-examples

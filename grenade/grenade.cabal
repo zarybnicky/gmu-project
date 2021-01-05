@@ -50,10 +50,15 @@ library
                      , singletons
                      , vector                          >= 0.11        && < 0.13
 
+                     , file-embed
+                     , OpenCL
+                     , CLUtil
+
   ghc-options:
                        -Wall
   hs-source-dirs:
                        src
+                       src-gmu
 
   default-language:    Haskell2010
 
@@ -111,6 +116,9 @@ library
                        Grenade.Recurrent.Layers.LSTM
 
                        Grenade.Utils.OneHot
+
+                       Grenade.OpenCL.Context
+                       Grenade.OpenCL.FullyConnected
 
   includes:            cbits/im2col.h
                        cbits/gradient_descent.h

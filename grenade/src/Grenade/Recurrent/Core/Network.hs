@@ -28,7 +28,7 @@ module Grenade.Recurrent.Core.Network (
   ) where
 
 
-import           Control.Monad.Random ( MonadRandom )
+import           Control.Monad.Random (MonadIO,  MonadRandom )
 import           Data.Singletons ( SingI )
 import           Data.Singletons.Prelude ( Head, Last )
 import           Data.Serialize
@@ -211,7 +211,7 @@ instance (Show x, Show (RecurrentNetwork xs rs)) => Show (RecurrentNetwork (Recu
 --   recurrent network and a set of random inputs for it is with the randomRecurrent.
 class CreatableRecurrent (xs :: [Type]) (ss :: [Shape]) where
   -- | Create a network of the types requested
-  randomRecurrent :: MonadRandom m => m (RecurrentNetwork xs ss)
+  randomRecurrent :: (MonadIO m, MonadRandom m) => m (RecurrentNetwork xs ss)
 
 instance SingI i => CreatableRecurrent '[] '[i] where
   randomRecurrent =
