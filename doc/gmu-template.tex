@@ -1,0 +1,106 @@
+\documentclass[11pt,a4paper]{article}
+\input{config}
+\usepackage{hyperref}
+\begin{document}
+\titlepageandcontents
+
+%---------------------------------------------------------------------------
+\section{Zadání}
+
+Formální zadání:
+\begin{itemize}
+  \item Nastudujte neuronové sítě (back propagation, inference, ...)
+  \item Implementujte framework umožňující konfiguraci topologie sítě, nastavování vlastních aktivačních funkcí, trénování).
+  \item Implementujte jednoduchou aplikaci využívající framework.
+\end{itemize}
+
+Interpretace:
+
+\begin{itemize}
+\item Několik pokusů o řešení: CUDA (následné zjištění, že se CUDA nedá
+  emulovat), Vulkan (pomocí compute shaders), raw OpenCL v C++ (po správném
+  přečtení zadání ``v OpenCL''), raw OpenCL v Haskellu a poslední varianta:
+\item Poté, co se mé řešení začalo nebezpečně podobat jednomu existujícímu
+  frameworku jsem zvolil alternativu takovou, že tento framework využiji a
+  vylepším/paralelizuji.
+\end{itemize}
+
+\section{Použité technologie}
+
+\begin{itemize}
+  \item OpenCL
+  \item HMatrix
+  \item Grenade
+    \\
+  \item Namísto CMake použit Nix, který narozdíl od CMake dobře podporuje Haskell
+  \item Žádné další závoslosti,
+\end{itemize}
+
+\section{Použité zdroje}
+
+\begin{itemize}
+  \item \url{https://github.com/HuwCampbell/grenade}
+  \item \url{https://github.com/IFCA/opencl}
+  \item \url{https://github.com/acowley/CLUtil}
+\end{itemize}
+
+%---------------------------------------------------------------------------
+\section{Způsob akcelerace}
+
+\begin{itemize}
+  \item Paralelizace procesu trénování i inference sítě v OpenCL (matrix-vector
+    multiplication, matrix-matrix multiplication, outer vector product)
+  \item Konkrétně implementace tří maticových algoritmů pro FCNN
+  \item Následné zjištění, že soupeřím s BLAS/LAPACK v původní verzi software a
+    ladění výkonu FFI mezi Haskell a OpenCL
+\end{itemize}
+
+První pokusy o zrychlení pouze \texttt{cbits} částí frameworku --- konkrétně
+gradient descent a konvoluční algoritmy --- vedly k pětinásobnému zpomalení a
+rychle jsem je zavrhl - \textit{overhead} neustálého kopírování dat mezi
+programem a OpenCL byl příliš vysoký.
+
+Implementoval jsem namísto toho typ vrstvy neuronů, která celá věží na OpenCL,
+ale je zároveň interoperabilní se zbytkem kódu psaného čistě v Haskellu.
+
+\section{Ovládání vytvořeného programu}
+
+Je potřeba nainstalovat Nix, konkrétně \texttt{nixFlakes}, experimentální Nix
+verze 3.0, který pak nainstaluje veškeré potřebné závislosti.
+
+Jelikož se má jednat o framework, demonstrační program samotný je triviální a dá
+se spustit v kořenovém adresáři uvnitř prostředí \texttt{nix shell} pomocí
+
+\begin{verbatim}
+cabal run grenade-examples:exe:feedforward
+\end{verbatim}
+
+popř. pro profilování je možné použít
+
+\begin{verbatim}
+cabal run --enable-profiling -- grenade-examples:exe:feedforward +RTS -p -s
+\end{verbatim}
+
+\section{Vyhodnocení}
+
+Testováno na \texttt{intel-ocl} na vestavěné grafické kartě, jelikož nemám
+přístup k GPU zařízením.
+
+Rychlost akcelerovaných vrstev je přibližně konstatní při rostoucí velikosti,
+nebo roste zanedbatelně, zatímco rychlost vrstev používajících BLAS roste
+lineárně --- zřejmě FFI \textit{overhead} je při použití příliš malých matic
+příliš vysoký, protože maticové operace pouze pomocí BLAS bez nutnosti
+kopírování matic jsou znatelně rychlejší. Při velikosti vrstev kolem 700 neuronů
+už se rychlosti vyrovnaly.
+
+%---------------------------------------------------------------------------
+\section{Rozdělení práce v týmu}
+
+Sólový projekt.
+
+\end{document}
+% vim:set ft=tex expandtab enc=utf8:
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: t
+%%% End:
