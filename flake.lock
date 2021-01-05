@@ -1,5 +1,22 @@
 {
   "nodes": {
+    "CLUtil": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1564839395,
+        "narHash": "sha256-ors7h/7Qo8W80tGY2yjKwmdASTpfzMMbu8YR8LqT87w=",
+        "owner": "acowley",
+        "repo": "CLUtil",
+        "rev": "d57f05cb3419001b3079d4dfd738bf4538a115ce",
+        "type": "github"
+      },
+      "original": {
+        "owner": "acowley",
+        "ref": "master",
+        "repo": "CLUtil",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1609337906,
@@ -18,6 +35,7 @@
     },
     "root": {
       "inputs": {
+        "CLUtil": "CLUtil",
         "nixpkgs": "nixpkgs"
       }
     }
