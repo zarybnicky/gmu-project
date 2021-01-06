@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE BangPatterns          #-}
 {-# LANGUAGE CPP                   #-}
 {-# LANGUAGE DataKinds             #-}
@@ -17,8 +19,8 @@ import           Options.Applicative
 
 import           Grenade
 
---import Grenade.OpenCL.FullyConnected (FullyConnectedCL(..))
-import System.Exit (exitSuccess)
+import Grenade.OpenCL.FullyConnected (FullyConnected'CL(..), FullyConnectedCL(..))
+import Grenade.OpenCL.Context (readBufferL, withCL, readBufferR)
 
 
 -- The defininition for our simple feed forward network.
@@ -28,9 +30,9 @@ import System.Exit (exitSuccess)
 --
 -- With around 100000 examples, this should show two clear circles which have been learned by the network.
 type FFNet = Network
-  '[ FullyConnected 2 40
+  '[ FullyConnectedCL 2 40
    , Tanh
-   , FullyConnected 40 10
+   , FullyConnectedCL 40 10
    , Relu
    , FullyConnected 10 1
    , Logit
@@ -105,8 +107,7 @@ main = do
     FeedForwardOpts examples rate _load _save <- execParser (info (feedForward' <**> helper) idm)
     -- net0 <- maybe randomNet netLoad load
     net0 <- randomNet
-    !net <- netTrain net0 rate examples
-    _ <- exitSuccess
+    net <- netTrain net0 rate examples
     netScore net
 
     -- case save of

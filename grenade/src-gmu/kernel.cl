@@ -46,11 +46,11 @@ kernel void fcnn_update(
   int i = get_global_id(0);
   double momentum_ = momentum * lastVec[i] - rate * gradientVec[i];
   lastVec[i] = momentum_;
-  weightsVec[i] = mad(weightsVec[i], 1 - rate * regulariser, momentum_);
+  weightsVec[i] = (rate * regulariser - 1) * weightsVec[i] + momentum_;
   for (unsigned j = 0; j < cols; j++) {
-    double momentum_ = momentum * lastVec[j * rows + i] - rate * gradientMat[j * rows + i];
-    lastMat[j * rows + i] = momentum_;
-    weightsMat[j * rows + i] = mad(weightsMat[j * rows + i], 1 - rate * regulariser, momentum_);
+    double momentum_ = momentum * lastMat[i + rows * j] - rate * gradientMat[i + rows * j];
+    lastMat[i + rows * j] = momentum_;
+    weightsMat[i + rows * j] = (rate * regulariser - 1) * weightsMat[i + rows * j] + momentum_;
   }
 }
 

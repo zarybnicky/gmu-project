@@ -29,12 +29,12 @@ data FullyConnectedCL i o = FullyConnectedCL
   , kForward :: !CLKernel
   , kBackward :: !CLKernel
   , lpRef :: !(IORef (Maybe LearningParameters))
-  , wTape :: !(CLBuffer (R i))          -- work vector
   , wIn :: !(CLBuffer (R i))          -- work vector
   , wOut :: !(CLBuffer (R o))          -- work vector
-  , wGradient :: !(FullyConnected'CL i o)   -- work gradient
-  , wWeights :: !(FullyConnected'CL i o)   -- Neuron weights
-  , wMomentum :: !(FullyConnected'CL i o)   -- Neuron momentum
+  , vecTape :: !(CLBuffer (R i))          -- work vector
+  , vecGradient :: !(FullyConnected'CL i o)   -- work gradient
+  , vecWeights :: !(FullyConnected'CL i o)   -- Neuron weights
+  , vecMomentum :: !(FullyConnected'CL i o)   -- Neuron momentum
   }
 
 data FullyConnected'CL i o = FullyConnected'CL
@@ -73,7 +73,7 @@ instance (KnownNat i, KnownNat o) => Layer (FullyConnectedCL i o) ('D1 i) ('D1 o
   -- (v, S1D (wB + wN #> v))
   runForwards n (S1D v) =
     unsafeWithCL $ \cl -> do
-      writeBufferR cl (wTape n) v
+      writeBufferR cl (vecTape n) v
       _ <- clEnqueueNDRangeKernel' (clQueue cl) (kForward n) [len]
       res <- readBufferR cl (wOut n) (Just (konst 0))
       pure ((), S1D res)
@@ -86,7 +86,7 @@ instance (KnownNat i, KnownNat o) => Layer (FullyConnectedCL i o) ('D1 i) ('D1 o
   -- in  (FullyConnected'CL wB' mm', S1D dWs)
   runBackwards n () (S1D dEdy) =
     unsafeWithCL $ \cl -> do
-      let FullyConnected'CL bG _ = wGradient n
+      let FullyConnected'CL bG _ = vecGradient n
       writeBufferR cl bG dEdy
       _ <- clEnqueueNDRangeKernel' (clQueue cl) (kBackward n) [len]
       dWs <- readBufferR cl (wIn n) (Just (konst 0))
@@ -109,10 +109,10 @@ randomFullyConnectedCL = do
     aG <- mkBufferL cl (konst 0)
     wIn <- mkBufferR cl (konst 0)
     wOut <- mkBufferR cl (konst 0)
-    wTape <- mkBufferR cl (konst 0)
-    let wWeights = FullyConnected'CL oB oA
-        wMomentum = FullyConnected'CL oBM oM
-        wGradient = FullyConnected'CL bG aG
+    vecTape <- mkBufferR cl (konst 0)
+    let vecWeights = FullyConnected'CL oB oA
+        vecMomentum = FullyConnected'CL oBM oM
+        vecGradient = FullyConnected'CL bG aG
 
     kUpdate <- clCreateKernel (clProgram cl) "fcnn_update"
     clSetKernelArgSto' kUpdate 0 (fromIntegral @_ @Int32 (natVal (Proxy @o)))
@@ -128,7 +128,7 @@ randomFullyConnectedCL = do
     clSetKernelArgSto' kForward 0 (fromIntegral @_ @Int32 (natVal (Proxy @o)))
     clSetKernelArgSto' kForward 1 (fromIntegral @_ @Int32 (natVal (Proxy @i)))
     clSetKernelArgSto' kForward 2 oA
-    clSetKernelArgSto' kForward 3 wTape
+    clSetKernelArgSto' kForward 3 vecTape
     clSetKernelArgSto' kForward 4 oB
     clSetKernelArgSto' kForward 5 wOut
 
@@ -136,7 +136,7 @@ randomFullyConnectedCL = do
     clSetKernelArgSto' kBackward 0 (fromIntegral @_ @Int32 (natVal (Proxy @o)))
     clSetKernelArgSto' kBackward 1 (fromIntegral @_ @Int32 (natVal (Proxy @i)))
     clSetKernelArgSto' kBackward 2 bG
-    clSetKernelArgSto' kBackward 3 wTape
+    clSetKernelArgSto' kBackward 3 vecTape
     clSetKernelArgSto' kBackward 4 oA
     clSetKernelArgSto' kBackward 5 aG
     clSetKernelArgSto' kBackward 6 wIn

@@ -32,30 +32,31 @@ module Grenade.OpenCL.Context
   , clEnqueueWriteBuffer'
   ) where
 
-import Control.Parallel.OpenCL
+import Control.DeepSeq (NFData)
 import Control.Exception (throwIO, throw, handle)
+import Control.Parallel.OpenCL
 import Data.FileEmbed (embedStringFile, makeRelativeToProject)
 import Data.IORef (IORef, readIORef, newIORef)
+import Data.Int (Int32)
 import Data.Maybe (fromJust)
 import Data.Proxy (Proxy(Proxy))
 import Data.Singletons.TypeLits (KnownNat, natVal)
 import Data.Vector.Storable (Vector, unsafeFromForeignPtr0, unsafeToForeignPtr0)
+import Data.Word (Word32)
 import Foreign.C.Types (CBool(..), CSize(..), CDouble)
-import Foreign.Marshal (fromBool, with, alloca, withArray)
 import Foreign.ForeignPtr (mallocForeignPtrArray, withForeignPtr)
+import Foreign.Marshal (fromBool, with, alloca, withArray)
 import Foreign.Ptr (Ptr, castPtr, nullPtr)
+import Foreign.StablePtr (deRefStablePtr, newStablePtr, StablePtr)
 import Foreign.Storable (Storable(sizeOf))
-import Numeric.LinearAlgebra.Static (L, R, extract, create)
 import Numeric.LinearAlgebra.Data (tr, flatten)
+import Numeric.LinearAlgebra.Devel (MatrixOrder(ColumnMajor), matrixFromVector)
+import Numeric.LinearAlgebra.Static (L, R, extract, create)
 import System.IO.Unsafe (unsafePerformIO)
 import System.Mem.Weak (addFinalizer)
-import Numeric.LinearAlgebra.Devel (MatrixOrder(ColumnMajor), matrixFromVector)
-import Data.Int (Int32)
-import Data.Word (Word32)
-import Control.DeepSeq (NFData)
 
 data CLState = CLState
-  { clContext :: {-# UNPACK #-} !CLContext
+  { clContext :: {-# UNPACK #-} !(StablePtr CLContext)
   , clDevice :: {-# UNPACK #-} !CLDeviceID
   , clQueue :: {-# UNPACK #-} !CLCommandQueue
   , clProgram :: {-# UNPACK #-} !CLProgram
@@ -74,29 +75,30 @@ source = $(embedStringFile =<< makeRelativeToProject "src-gmu/kernel.cl")
 globalCLState :: IORef CLState
 {-# NOINLINE globalCLState #-}
 globalCLState = unsafePerformIO $ do
-  clContext <- clCreateContextFromType [] [CL_DEVICE_TYPE_CPU] print
-  clDevice <- head <$> clGetContextDevices clContext
-  clQueue <- clCreateCommandQueue clContext clDevice []
+  context <- clCreateContextFromType [] [CL_DEVICE_TYPE_CPU] print
+  clContext <- newStablePtr context
+  clDevice <- head <$> clGetContextDevices context
+  clQueue <- clCreateCommandQueue context clDevice []
   putStrLn . ("Platform: " <>) =<< (`clGetPlatformInfo` CL_PLATFORM_NAME) =<< clGetDevicePlatform clDevice
   putStrLn . ("Device: " <>) =<< clGetDeviceName clDevice
   putStrLn . ("Max work group size: " <>) . show =<< clGetDeviceMaxWorkGroupSize clDevice
   putStrLn . ("Max work item  dims: " <>) . show =<< clGetDeviceMaxWorkItemDimensions clDevice
   putStrLn . ("Max work item sizes: " <>) . show =<< clGetDeviceMaxWorkItemSizes clDevice
 
-  clProgram <- clCreateProgramWithSource clContext source
+  clProgram <- clCreateProgramWithSource context source
   handle @CLError
     (\err -> (putStrLn =<< clGetProgramBuildLog clProgram clDevice) >> throw err)
     (clBuildProgram clProgram [clDevice] "")
 
-  clWeights <- clCreateBuffer clContext [CL_MEM_READ_ONLY, CL_MEM_ALLOC_HOST_PTR]
+  clWeights <- clCreateBuffer context [CL_MEM_READ_ONLY, CL_MEM_ALLOC_HOST_PTR]
     (sizeOf (undefined :: CDouble) * 500, nullPtr)
-  clGradient <- clCreateBuffer clContext [CL_MEM_READ_ONLY, CL_MEM_ALLOC_HOST_PTR]
+  clGradient <- clCreateBuffer context [CL_MEM_READ_ONLY, CL_MEM_ALLOC_HOST_PTR]
     (sizeOf (undefined :: CDouble) * 500, nullPtr)
-  clLastUpdate <- clCreateBuffer clContext [CL_MEM_READ_ONLY, CL_MEM_ALLOC_HOST_PTR]
+  clLastUpdate <- clCreateBuffer context [CL_MEM_READ_ONLY, CL_MEM_ALLOC_HOST_PTR]
     (sizeOf (undefined :: CDouble) * 500, nullPtr)
-  clNewKernel <- clCreateBuffer clContext [CL_MEM_WRITE_ONLY, CL_MEM_ALLOC_HOST_PTR]
+  clNewKernel <- clCreateBuffer context [CL_MEM_WRITE_ONLY, CL_MEM_ALLOC_HOST_PTR]
     (sizeOf (undefined :: CDouble) * 500, nullPtr)
-  clNewMomentum <- clCreateBuffer clContext [CL_MEM_WRITE_ONLY, CL_MEM_ALLOC_HOST_PTR]
+  clNewMomentum <- clCreateBuffer context [CL_MEM_WRITE_ONLY, CL_MEM_ALLOC_HOST_PTR]
     (sizeOf (undefined :: CDouble) * 500, nullPtr)
 
   clKDescend <- clCreateKernel clProgram "descend_slow"
@@ -107,7 +109,7 @@ globalCLState = unsafePerformIO $ do
   clSetKernelArgSto clKDescend 7 clNewMomentum
 
   let s = CLState {..}
-  addFinalizer s (() <$ clReleaseContext clContext)
+  addFinalizer s (() <$ (clReleaseContext =<< deRefStablePtr clContext))
   newIORef CLState {..}
 
 unsafeWithCL :: (CLState -> IO a) -> a
@@ -157,8 +159,9 @@ readBufferL cl (CLBuffer buf) mMat = do
 
 mkBufferR :: forall n. KnownNat n => CLState -> R n -> IO (CLBuffer (R n))
 mkBufferR cl vec =
-  withForeignPtr (fst (unsafeToForeignPtr0 (extract vec))) $ \ptr ->
-    CLBuffer <$> clCreateBuffer (clContext cl) [CL_MEM_READ_WRITE, CL_MEM_COPY_HOST_PTR] (size, castPtr ptr)
+  withForeignPtr (fst (unsafeToForeignPtr0 (extract vec))) $ \ptr -> do
+    context <- deRefStablePtr (clContext cl)
+    CLBuffer <$> clCreateBuffer context [CL_MEM_READ_WRITE, CL_MEM_COPY_HOST_PTR] (size, castPtr ptr)
   where
     len = fromIntegral (natVal (Proxy @n))
     size = sizeOf (undefined :: CDouble) * len
@@ -166,7 +169,8 @@ mkBufferR cl vec =
 mkBufferL :: forall m n. (KnownNat m, KnownNat n) => CLState -> L m n -> IO (CLBuffer (L m n))
 mkBufferL cl mat =
   withForeignPtr (fst (unsafeToForeignPtr0 vec)) $ \ptr -> do
-    buf <- clCreateBuffer (clContext cl) [CL_MEM_READ_WRITE, CL_MEM_COPY_HOST_PTR] (size, castPtr ptr)
+    context <- deRefStablePtr (clContext cl)
+    buf <- clCreateBuffer context [CL_MEM_READ_WRITE, CL_MEM_COPY_HOST_PTR] (size, castPtr ptr)
     pure $ CLBuffer buf
   where
     vec = flatten (tr (extract mat))
